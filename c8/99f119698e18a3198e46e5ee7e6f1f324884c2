@@ -1,0 +1,26 @@
+lista_espera_salud.tex
+  s_4214a6a0b97ef2::t_5063ee45470d35 407
+  s_4214a6a0b97ef2::t_74ad5ecfa4821a 259-260
+  s_4214a6a0b97ef2::t_7965766f13ba20 165
+  s_4214a6a0b97ef2::t_7a3f8d3d40a28e 24
+  s_4214a6a0b97ef2::t_d0624ff57a893d 309
+lista_espera_salud.mdl
+  s_4214a6a0b97ef2::t_0ae43961c289d4 119-123
+  s_4214a6a0b97ef2::t_99c316dd95d1c5 24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "c899f119698e18a3198e46e5ee7e6f1f324884c2",
+  "prompts": {},
+  "sessions": {
+    "s_4214a6a0b97ef2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ac69c0d4-136c-4a9d-812d-ba34b3fc222e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "PitehrHurtado <pitehr.hurtado.c@mail.pucv.cl>"
+    }
+  }
+}
