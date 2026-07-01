@@ -1,22 +1,19 @@
 {UTF-8}
-Horas Atencion  = A FUNCTION OF( Horas Especialistas Sector Publico) ~~|
-Horas Atencion=2.5
+Horas Atencion=0.6
 	~	pacientes/hora
-	~	PARAMETRO [CALIBRAR]. Productividad: pacientes de la lista atendidos por \
-		hora de especialista. Independiente de la dotacion.
+	~	PARAMETRO CALIBRADO. r_at * p_h = 0.30 * 2.0 = 0.6 pac/hora
+		(fraccion horas a lista x productividad). Fuente: operacion CDE.
 	|
 
-Pacientes Atendidos  = A FUNCTION OF( Horas Atencion) ~~|
 Pacientes Atendidos=Horas Especialistas Sector Publico*Horas Atencion
 	~	pacientes/Mes
 	~	AUXILIAR. Capacidad de atencion = dotacion de horas x productividad.
 	|
 
-Demanda Total Publica=2500
+Demanda Total Publica=274.6
 	~	pacientes/Mes
-	~	PARAMETRO EXOGENO [CALIBRAR con SIGTE-SSVSA]. Personas que ingresan \
-		mensualmente a la lista No-GES del sector publico. Toda la demanda publica \
-		entra a la lista; la fuga al privado se modela en la salida.
+	~	PARAMETRO CALIBRADO. Media de derivaciones mensuales CG SIGTE-SSVSA 2021-2025.
+		sigma=60.16 pac/mes. Modo determinista (media).
 	|
 
 Ingreso Lista=Demanda Total Publica
@@ -25,22 +22,18 @@ Ingreso Lista=Demanda Total Publica
 		igual a la demanda total del sector publico.
 	|
 
-Lista de Espera= INTEG (Ingreso Lista-Egreso Atencion-Egreso hacia el privado-Egresos Varios\
-		,40000)
+Lista de Espera= INTEG (Ingreso Lista-Egreso Atencion-Egreso hacia el privado-Egresos Varios,683)
 	~	pacientes
-	~	NIVEL. Stock de pacientes en lista de espera No-GES del sector publico. \
-		Valor inicial 40000 [CALIBRAR con SIGTE-SSVSA, ano base].
+	~	NIVEL. Stock central. Condicion inicial: 683 pac. (enero 2021, SIGTE-SSVSA).
 	|
 
-Diferencia Salario sector Publico vs Privado=1+0.3*(Demanda Sector Privado/1000-1)
+Diferencia Salario sector Publico vs Privado=1+0.3*(Demanda Sector Privado/3-1)
 	~	Dmnl
-	~	AUXILIAR (indice). Brecha salarial privado/publico relativa a una \
-		referencia. =1 en la referencia; >1 cuando la demanda privada la supera. \
-		Inline [CALIBRAR]: sensibilidad=0.3, Demanda Privado referencia=1000.
+	~	AUXILIAR. Indice de brecha salarial. =1 cuando fuga=3 pac/mes (referencia
+		calibrada sobre fuga inicial NB2). Sensibilidad=0.3.
 	|
 
-Horas Especialistas Sector Publico=SMOOTH(MAX(1000*(1-0.15*(Diferencia Salario sector Publico vs Privado\
-		-1)),0),12)
+Horas Especialistas Sector Publico= INTEG((MAX(400*(1-0.15*(Diferencia Salario sector Publico vs Privado-1)),0)-Horas Especialistas Sector Publico)/12,400)
 	~	horas/Mes
 	~	NIVEL implicito (SMOOTH). Horas de especialista en el sector publico. La \
 		dotacion efectiva se ajusta con retardo (12 meses [CALIBRAR]) hacia una \
@@ -56,7 +49,7 @@ Egreso Atencion=MIN(Pacientes Atendidos,Lista de Espera/TIME STEP)
 		stock para no drenar mas de lo disponible.
 	|
 
-Tasa Egresos Administrativos=0.008
+Tasa Egresos Administrativos=0.01025
 	~	1/Mes
 	~	PARAMETRO [CALIBRAR]. Fraccion de la lista que egresa por razones \
 		administrativas (desistimiento, duplicados, fallecidos, cambio de \
@@ -76,12 +69,10 @@ Tiempo de Espera=Lista de Espera/MAX(Egreso Atencion,1)
 		incluir tambien la fuga generaria un lazo algebraico TE<->fuga.
 	|
 
-Egreso hacia el privado=MIN(0.04*(Tiempo de Espera/(Tiempo de Espera+6))*Lista de Espera\
-		,Lista de Espera/TIME STEP)
+Egreso hacia el privado=MIN(0.012*(Tiempo de Espera/(Tiempo de Espera+6))*Lista de Espera,Lista de Espera/TIME STEP)
 	~	pacientes/Mes
-	~	FLUJO DE SALIDA. Fuga al sector privado: pacientes que abandonan la lista \
-		publica por el tiempo de espera. Propension saturante creciente con TE. \
-		Fuga maxima=0.04 1/Mes, TE tolerable=6 Mes [CALIBRAR].
+	~	FLUJO DE SALIDA. Fuga saturante calibrada: f_max=0.012, TE_ref=6 mes.
+		Aproximacion Michaelis-Menten de la NB2 (Python). A TE=2.85 mes, L=683 -> fuga~2.7 pac/mes.
 	|
 
 Demanda Sector Privado=Egreso hacia el privado
@@ -96,9 +87,9 @@ Demanda Sector Privado=Egreso hacia el privado
 		Simulation Control Parameters
 	|
 
-FINAL TIME  = 120
+FINAL TIME  = 55
 	~	Mes
-	~	Horizonte de simulacion (10 anos).
+	~	Horizonte de simulacion: 55 meses (enero 2021 - julio 2025).
 	|
 
 INITIAL TIME  = 0
@@ -106,15 +97,9 @@ INITIAL TIME  = 0
 	~	Tiempo inicial de la simulacion.
 	|
 
-SAVEPER  =
-        TIME STEP
+SAVEPER  = TIME STEP
 	~	Mes [0,?]
 	~	Frecuencia de guardado de resultados.
-	|
-
-METHOD  = EULER
-	~	
-	~	Metodo de integracion (Euler, recomendado para SD con MIN/MAX).
 	|
 
 TIME STEP  = 0.25
@@ -125,58 +110,57 @@ TIME STEP  = 0.25
 \\\---/// Sketch information - do not modify anything except names
 V300  Do not put anything below this section - it will be ignored
 *View 1
-$-1--1--1,0,|12||-1--1--1|-1--1--1|-1--1--1|-1--1--1|-1--1--1|96,96,183,2
-10,1,Lista de Espera,662,241,85,142,3,3,0,0,-1,0,0,0,0,0,0,0,0,0
-12,2,48,358,218,10,8,0,3,0,0,-1,0,0,0,0,0,0,0,0,0
-1,3,5,2,100,0,0,22,0,192,0,-1--1--1,,1|(418,218)|
-1,4,5,1,4,0,0,22,0,192,0,-1--1--1,,1|(530,218)|
-11,5,0,476,218,8,9,34,3,0,0,1,0,0,0,0,0,0,0,0,0
-10,6,Ingreso Lista,476,246,89,19,40,3,0,0,-1,0,0,0,0,0,0,0,0,0
-12,7,48,1009,213,10,8,0,3,0,0,-1,0,0,0,0,0,0,0,0,0
-1,8,10,1,100,0,0,22,0,192,0,-1--1--1,,1|(795,213)|
-1,9,10,7,4,0,0,22,0,192,0,-1--1--1,,1|(933,213)|
-11,10,0,856,213,12,9,34,3,0,0,1,0,0,0,0,0,0,0,0,0
-10,11,Egreso Atencion,856,240,58,18,40,3,0,0,-1,0,0,0,0,0,0,0,0,0
-12,12,48,995,111,10,8,0,3,0,0,-1,0,0,0,0,0,0,0,0,0
-1,13,15,1,100,0,0,22,0,192,0,-1--1--1,,1|(799,111)|
-1,14,15,12,4,0,0,22,0,192,0,-1--1--1,,1|(924,111)|
-11,15,0,857,111,6,8,34,3,0,0,1,0,0,0,0,0,0,0,0,0
-10,16,Egresos Varios,857,137,78,18,40,3,0,0,-1,0,0,0,0,0,0,0,0,0
-10,17,Tiempo de Espera,654,464,62,18,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
-10,18,Pacientes Atendidos,1106,241,70,45,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
-10,19,Demanda Sector Privado,1088,430,47,20,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
-10,20,Demanda Total Publica,476,336,82,38,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
-10,21,Horas Especialistas Sector Publico,1297,325,78,21,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
-10,22,Horas Atencion,1289,238,52,28,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
-10,23,Tasa Egresos Administrativos,1062,135,37,33,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
+$-1--1--1,0,|12||-1--1--1|-1--1--1|-1--1--1|-1--1--1|-1--1--1|96,96,85,2
+10,1,Lista de Espera,571,391,85,142,3,3,0,0,-1,0,0,0,0,0,0,0,0,0
+12,2,48,267,368,10,8,0,3,0,0,-1,0,0,0,0,0,0,0,0,0
+1,3,5,2,100,0,0,22,0,192,0,-1--1--1,,1|(327,368)|
+1,4,5,1,4,0,0,22,0,192,0,-1--1--1,,1|(439,368)|
+11,5,0,385,368,8,9,34,3,0,0,1,0,0,0,0,0,0,0,0,0
+10,6,Ingreso Lista,385,396,89,19,40,3,0,0,-1,0,0,0,0,0,0,0,0,0
+12,7,48,918,363,10,8,0,3,0,0,-1,0,0,0,0,0,0,0,0,0
+1,8,10,1,100,0,0,22,0,192,0,-1--1--1,,1|(704,363)|
+1,9,10,7,4,0,0,22,0,192,0,-1--1--1,,1|(842,363)|
+11,10,0,765,363,12,9,34,3,0,0,1,0,0,0,0,0,0,0,0,0
+10,11,Egreso Atencion,765,390,58,18,40,3,0,0,-1,0,0,0,0,0,0,0,0,0
+12,12,48,904,261,10,8,0,3,0,0,-1,0,0,0,0,0,0,0,0,0
+1,13,15,1,100,0,0,22,0,192,0,-1--1--1,,1|(708,261)|
+1,14,15,12,4,0,0,22,0,192,0,-1--1--1,,1|(833,261)|
+11,15,0,766,261,6,8,34,3,0,0,1,0,0,0,0,0,0,0,0,0
+10,16,Egresos Varios,766,287,78,18,40,3,0,0,-1,0,0,0,0,0,0,0,0,0
+10,17,Tiempo de Espera,563,614,62,18,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
+10,18,Pacientes Atendidos,1015,391,70,45,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
+10,19,Demanda Sector Privado,997,580,47,20,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
+10,20,Demanda Total Publica,385,486,82,38,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
+10,21,Horas Especialistas Sector Publico,1206,475,78,21,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
+10,22,Horas Atencion,1198,388,52,28,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
+10,23,Tasa Egresos Administrativos,971,285,37,33,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
 1,24,20,6,0,0,43,0,0,192,0,-1--1--1,,1|(0,0)|
 1,25,18,11,0,0,0,0,0,192,0,-1--1--1,,1|(0,0)|
 1,26,23,16,0,0,43,0,0,192,0,-1--1--1,,1|(0,0)|
 1,27,1,17,0,0,43,0,0,192,0,-1--1--1,,1|(0,0)|
 1,28,22,18,0,0,43,0,0,192,0,-1--1--1,,1|(0,0)|
-1,29,17,35,1,0,43,0,0,192,0,-1--1--1,,1|(763,463)|
+1,29,17,35,1,0,43,0,0,192,0,-1--1--1,,1|(672,613)|
 1,30,19,37,0,0,43,0,0,192,0,-1--1--1,,1|(0,0)|
-12,31,48,1002,373,10,8,0,3,0,0,-1,0,0,0,0,0,0,0,0,0
-1,32,34,1,100,0,0,22,0,192,0,-1--1--1,,1|(797,373)|
-1,33,34,31,4,0,0,22,0,192,0,-1--1--1,,1|(925,373)|
-11,34,0,853,373,6,8,34,3,0,0,1,0,0,0,0,0,0,0,0,0
-10,35,Egreso hacia el privado,853,407,55,26,40,3,0,0,-1,0,0,0,0,0,0,0,0,0
+12,31,48,911,523,10,8,0,3,0,0,-1,0,0,0,0,0,0,0,0,0
+1,32,34,1,100,0,0,22,0,192,0,-1--1--1,,1|(706,523)|
+1,33,34,31,4,0,0,22,0,192,0,-1--1--1,,1|(834,523)|
+11,34,0,762,523,6,8,34,3,0,0,1,0,0,0,0,0,0,0,0,0
+10,35,Egreso hacia el privado,762,557,55,26,40,3,0,0,-1,0,0,0,0,0,0,0,0,0
 1,36,35,19,0,0,43,0,0,192,0,-1--1--1,,1|(0,0)|
-10,37,Diferencia Salario sector Publico vs Privado,1300,428,66,36,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
+10,37,Diferencia Salario sector Publico vs Privado,1209,578,66,36,8,3,0,0,-1,0,0,0,0,0,0,0,0,0
 1,38,37,21,0,0,45,0,0,192,0,-1--1--1,,1|(0,0)|
 1,39,1,16,0,0,0,0,0,192,0,-1--1--1,,1|(0,0)|
 1,40,1,35,0,0,0,0,0,192,0,-1--1--1,,1|(0,0)|
 1,41,11,17,0,0,0,0,0,192,0,-1--1--1,,1|(0,0)|
 1,42,21,22,0,0,0,0,0,192,0,-1--1--1,,1|(0,0)|
 1,43,1,11,0,0,0,0,0,64,0,-1--1--1,,1|(0,0)|
-10,44,TIME STEP,884,315,41,27,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|||128-128-128,0,0,0,0,0,0
+10,44,TIME STEP,793,465,41,27,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|||128-128-128,0,0,0,0,0,0
 1,45,44,11,0,0,0,0,0,64,0,-1--1--1,,1|(0,0)|
-10,46,TIME STEP,886,501,41,27,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|||128-128-128,0,0,0,0,0,0
+10,46,TIME STEP,795,651,41,27,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|||128-128-128,0,0,0,0,0,0
 1,47,46,35,0,0,0,0,0,64,0,-1--1--1,,1|(0,0)|
 ///---\\\
 :L<%^E!@
-5:Horas Atencion
-19:183,0
+19:85,0
 24:0
 25:0
 26:0
